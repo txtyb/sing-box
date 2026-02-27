@@ -79,15 +79,17 @@ jobs:
           set -xeuo pipefail
           CRONET_GO_VERSION=$(cat .github/CRONET_GO_VERSION || echo "main")
           
-          if [ ! -d "/home/runner/cronet-go/.git" ]; then
-            echo "Cache miss or incomplete, cloning repository..."
-            git clone https://github.com/sagernet/cronet-go.git /home/runner/cronet-go
-          else
-            echo "Cache hit, skipping clone."
-          fi
-          
+          mkdir -p /home/runner/cronet-go
           cd /home/runner/cronet-go
-          git checkout $CRONET_GO_VERSION || true
+
+          if [ ! -d ".git" ]; then
+            echo "Directory exists due to cache but is not a repo. Initializing..."
+            git init
+            git remote add origin https://github.com/sagernet/cronet-go.git
+          fi
+
+          git fetch --depth=1 origin $CRONET_GO_VERSION
+          git checkout -f $CRONET_GO_VERSION
           git submodule update --init --recursive --depth=1
           
           go run ./cmd/build-naive download-toolchain --target=android/${{ matrix.arch }}
