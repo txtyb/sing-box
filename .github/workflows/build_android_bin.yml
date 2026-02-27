@@ -108,7 +108,7 @@ jobs:
           export CC="$TOOLCHAIN/${{ matrix.ndk_target }}-clang"
           export CXX="$TOOLCHAIN/${{ matrix.ndk_target }}-clang++"
           
-          export CGO_LDFLAGS="-L${{ env.CRONET_LIB_DIR }} -lcronet_static -lc++"
+          export CGO_LDFLAGS="-L${{ env.CRONET_LIB_DIR }} -lcronet_static -static-libstdc++"
           
           mkdir -p dist
           CGO_ENABLED=1 GOOS=android GOARCH=${{ matrix.arch }} \
