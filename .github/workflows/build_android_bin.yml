@@ -136,11 +136,18 @@ jobs:
           
           NDK_PATH="${{ steps.setup-ndk.outputs.ndk-path }}"
           TOOLCHAIN="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          export CC="$TOOLCHAIN/${{ matrix.ndk_target }}-clang"
-          export CXX="$TOOLCHAIN/${{ matrix.ndk_target }}-clang++"
+          
+          export CC="$TOOLCHAIN/clang"
+          export CXX="$TOOLCHAIN/clang++"
+          
+          export CGO_CFLAGS="--target=${{ matrix.ndk_target }}"
+          export CGO_CPPFLAGS="--target=${{ matrix.ndk_target }}"
+          export CGO_CXXFLAGS="--target=${{ matrix.ndk_target }}"
           
           if [[ "${{ matrix.naive }}" == "true" ]]; then
-            export CGO_LDFLAGS="-L${{ env.CRONET_LIB_DIR }} -lcronet_static -static-libstdc++"
+            export CGO_LDFLAGS="--target=${{ matrix.ndk_target }} -L${{ env.CRONET_LIB_DIR }} -lcronet_static -static-libstdc++"
+          else
+            export CGO_LDFLAGS="--target=${{ matrix.ndk_target }}"
           fi
           
           mkdir -p dist
