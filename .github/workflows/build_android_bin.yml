@@ -23,8 +23,7 @@ jobs:
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
           else
-            go run -v ./cmd/internal/read_tag --ci --nightly
-            echo "version=$version" >> "$GITHUB_OUTPUT"
+            echo "version=nightly" >> "$GITHUB_OUTPUT"
           fi
 
   build_android_bin:
@@ -47,12 +46,14 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ~1.25.7
+          cache: true
 
       - name: Setup Android NDK
         id: setup-ndk
         uses: nttld/setup-ndk@v1
         with:
           ndk-version: r28
+          local-cache: true
 
       - name: Install System Dependencies
         run: |
@@ -77,17 +78,24 @@ jobs:
         run: |
           set -xeuo pipefail
           CRONET_GO_VERSION=$(cat .github/CRONET_GO_VERSION || echo "main")
-          git clone --depth=1 https://github.com/sagernet/cronet-go.git ~/cronet-go
-          cd ~/cronet-go
+          
+          if [ ! -d "/home/runner/cronet-go/.git" ]; then
+            echo "Cache miss or incomplete, cloning repository..."
+            git clone https://github.com/sagernet/cronet-go.git /home/runner/cronet-go
+          else
+            echo "Cache hit, skipping clone."
+          fi
+          
+          cd /home/runner/cronet-go
+          git checkout $CRONET_GO_VERSION || true
           git submodule update --init --recursive --depth=1
           
           go run ./cmd/build-naive download-toolchain --target=android/${{ matrix.arch }}
-          
           go run ./cmd/build-naive build --target=android/${{ matrix.arch }}
           
-          LIB_PATH=$(find ~/cronet-go -name "libcronet_static.a" | head -n 1)
+          LIB_PATH=$(find /home/runner/cronet-go -name "libcronet_static.a" | head -n 1)
           echo "CRONET_LIB_DIR=$(dirname $LIB_PATH)" >> $GITHUB_ENV
-          echo "找到了静态库: $LIB_PATH"
+          echo "Found static lib at: $LIB_PATH"
 
       - name: Set Build Tags
         run: |
@@ -102,13 +110,14 @@ jobs:
           set -xeuo pipefail
           go install -v ./cmd/internal/build
           
-          # NDK 工具链配置
           NDK_PATH="${{ steps.setup-ndk.outputs.ndk-path }}"
           TOOLCHAIN="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin"
           export CC="$TOOLCHAIN/${{ matrix.ndk_target }}-clang"
           export CXX="$TOOLCHAIN/${{ matrix.ndk_target }}-clang++"
           
-          export CGO_LDFLAGS="-L${{ env.CRONET_LIB_DIR }} -lcronet_static -static-libstdc++"
+          if [[ "${{ matrix.naive }}" == "true" ]]; then
+            export CGO_LDFLAGS="-L${{ env.CRONET_LIB_DIR }} -lcronet_static -static-libstdc++"
+          fi
           
           mkdir -p dist
           CGO_ENABLED=1 GOOS=android GOARCH=${{ matrix.arch }} \
