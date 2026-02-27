@@ -81,23 +81,38 @@ jobs:
           
           mkdir -p /home/runner/cronet-go
           cd /home/runner/cronet-go
-
+          
           if [ ! -d ".git" ]; then
-            echo "Directory exists due to cache but is not a repo. Initializing..."
             git init
             git remote add origin https://github.com/sagernet/cronet-go.git
           fi
-
           git fetch --depth=1 origin $CRONET_GO_VERSION
           git checkout -f $CRONET_GO_VERSION
+
+          if [ -d "naiveproxy" ] && [ ! -d "naiveproxy/.git" ]; then
+            echo "Submodule dir exists but is not a repo. Moving cache out..."
+            mkdir -p /tmp/cronet_cache
+            [ -d "naiveproxy/src/out" ] && mv naiveproxy/src/out /tmp/cronet_cache/out
+            [ -d "naiveproxy/src/third_party/llvm-build" ] && mv naiveproxy/src/third_party/llvm-build /tmp/cronet_cache/llvm-build
+            [ -d "naiveproxy/src/build/linux/sysroot_scripts" ] && mv naiveproxy/src/build/linux/sysroot_scripts /tmp/cronet_cache/sysroot_scripts
+            rm -rf naiveproxy
+          fi
+
           git submodule update --init --recursive --depth=1
+
+          if [ -d "/tmp/cronet_cache/out" ]; then
+            echo "Restoring cached build artifacts..."
+            mkdir -p naiveproxy/src/third_party/ naiveproxy/src/build/linux/
+            mv /tmp/cronet_cache/out naiveproxy/src/
+            mv /tmp/cronet_cache/llvm-build naiveproxy/src/third_party/
+            mv /tmp/cronet_cache/sysroot_scripts naiveproxy/src/build/linux/
+          fi
           
           go run ./cmd/build-naive download-toolchain --target=android/${{ matrix.arch }}
           go run ./cmd/build-naive build --target=android/${{ matrix.arch }}
-          
+        
           LIB_PATH=$(find /home/runner/cronet-go -name "libcronet_static.a" | head -n 1)
           echo "CRONET_LIB_DIR=$(dirname $LIB_PATH)" >> $GITHUB_ENV
-          echo "Found static lib at: $LIB_PATH"
 
       - name: Set Build Tags
         run: |
