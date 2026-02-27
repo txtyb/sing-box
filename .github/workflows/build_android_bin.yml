@@ -99,10 +99,17 @@ jobs:
           fi
 
           git submodule update --init --recursive --depth=1
-
+          
           if [ -d "/tmp/cronet_cache/out" ]; then
             echo "Restoring cached build artifacts..."
-            mkdir -p naiveproxy/src/third_party/ naiveproxy/src/build/linux/
+            
+            rm -rf naiveproxy/src/out
+            rm -rf naiveproxy/src/third_party/llvm-build
+            rm -rf naiveproxy/src/build/linux/sysroot_scripts
+
+            mkdir -p naiveproxy/src/third_party/
+            mkdir -p naiveproxy/src/build/linux/
+            
             mv /tmp/cronet_cache/out naiveproxy/src/
             mv /tmp/cronet_cache/llvm-build naiveproxy/src/third_party/
             mv /tmp/cronet_cache/sysroot_scripts naiveproxy/src/build/linux/
@@ -110,7 +117,7 @@ jobs:
           
           go run ./cmd/build-naive download-toolchain --target=android/${{ matrix.arch }}
           go run ./cmd/build-naive build --target=android/${{ matrix.arch }}
-        
+          
           LIB_PATH=$(find /home/runner/cronet-go -name "libcronet_static.a" | head -n 1)
           echo "CRONET_LIB_DIR=$(dirname $LIB_PATH)" >> $GITHUB_ENV
 
